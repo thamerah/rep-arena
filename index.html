@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Rep Arena</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config={darkMode:'class',theme:{extend:{colors:{
+bg:'#0f1117',surface:'#1a1d27',surfaceHover:'#222633',border:'#2a2e3d',
+accent:'#6366f1',accentGlow:'#818cf8',success:'#22c55e',danger:'#ef4444',
+warn:'#f59e0b',muted:'#94a3b8'
+}}}}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;margin:0;
+  overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#1a1d27}
+::-webkit-scrollbar-thumb{background:#2a2e3d;border-radius:2px}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}70%{box-shadow:0 0 0 14px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+.timer-pulse{animation:pulse-ring 1s ease-out infinite}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.shake{animation:shake .3s ease-in-out}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.slide-up{animation:slideUp .25s ease-out}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.fade-in{animation:fadeIn .25s ease-out}
+.xp-fill,.trust-fill{transition:width .6s ease-out}
+.btn-action{min-height:48px;font-weight:600;border-radius:12px;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;width:100%;
+  touch-action:manipulation;user-select:none;cursor:pointer;border:none;font-size:15px}
+.btn-primary{background:#6366f1;color:#fff}.btn-primary:active{background:#4f46e5}
+.btn-secondary{background:#1a1d27;color:#cbd5e1;border:1px solid #2a2e3d}.btn-secondary:active{background:#222633}
+.btn-danger{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}.btn-danger:active{background:rgba(239,68,68,.25)}
+.btn-success{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}.btn-success:active{background:rgba(34,197,94,.25)}
+.btn-warn{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}.btn-warn:active{background:rgba(245,158,11,.25)}
+.btn-accent{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}.btn-accent:active{background:rgba(99,102,241,.25)}
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(15,17,23,.95);
+  backdrop-filter:blur(12px);border-top:1px solid #2a2e3d;padding:12px 16px;
+  padding-bottom:max(12px,env(safe-area-inset-bottom));z-index:40}
+.card{background:#1a1d27;border:1px solid #2a2e3d;border-radius:14px;padding:20px}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500}
+.checkbox-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:4px 0;cursor:pointer;user-select:none}
+.checkbox-row input[type=checkbox]{width:24px;height:24px;border-radius:6px;accent-color:#6366f1;cursor:pointer}
+.mode-card{background:#1a1d27;border:1px solid #2a2e3d;border-radius:14px;padding:20px;
+  width:100%;text-align:left;cursor:pointer;transition:border-color .15s;touch-action:manipulation}
+.mode-card:active{border-color:rgba(99,102,241,.5);background:#222633}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+// ═══════════════════════════════════════════════════════
+// PROFILE LOADING — tries local first, falls back to example
+// ═══════════════════════════════════════════════════════
+let PROFILE = {
+  DEGREE: "Pharm.D.",
+  UNIVERSITY: "a Saudi university",
+  HONORS: "with distinction",
+  CURRENT_EMPLOYER: "a community pharmacy chain",
+  MONTHS_EXPERIENCE: "several months",
+};
+
+try {
+  const local = await import('./profile.local.js');
+  PROFILE = local.PROFILE;
+} catch {
+  try {
+    const example = await import('./profile.example.js');
+    PROFILE = example.PROFILE;
+  } catch {}
+}
+
+function resolveTokens(str) {
+  return str
+    .replace(/\{\{DEGREE\}\}/g, PROFILE.DEGREE)
+    .replace(/\{\{UNIVERSITY\}\}/g, PROFILE.UNIVERSITY)
+    .replace(/\{\{HONORS\}\}/g, PROFILE.HONORS)
+    .replace(/\{\{CURRENT_EMPLOYER\}\}/g, PROFILE.CURRENT_EMPLOYER)
+    .replace(/\{\{MONTHS_EXPERIENCE\}\}/g, PROFILE.MONTHS_EXPERIENCE);
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTENT — edit freely; behavioral answers use {{TOKENS}}
+// ═══════════════════════════════════════════════════════
+const CONTENT = {
+  flashCards: [
+    // ── Company ──
+    {id:"c1",category:"Company",question:"What do you know about FAS United?",
+      answer:"FAS started in 1999 with the first IVF center in the Kingdom, founded by Faisal Al-Saadoun. Today they cover pharma, nutraceuticals, devices, and cosmeceuticals under one roof, manufacture locally, carry 380+ items, run a field force of 140+ reps, and invest in CME through the Faisal Al-Saadoun Academy. Strongest franchise: fertility for both partners — women's health and andrology.",
+      greenFlags:["Specific founding facts (1999, IVF center)","Name 2–3 products","Connect history to current strategy","Mention couple-based fertility approach"],
+      redFlags:["\"You're a big pharma company\"","Confusing FAS with United Pharmacy","Knowing nothing about the portfolio"]},
+
+    // ── Motivation ──
+    {id:"c2",category:"Motivation",question:"Why medical sales? Why now?",
+      answer:"Use Past → Pivot → Future: \"My background trained me to explain complex technical findings to decision-makers who don't have time. Medical sales is the same skill with a patient at the end of it. I want a target, a territory, and measurable results.\"",
+      greenFlags:["Money and targets mentioned honestly","Shows understanding of daily rep life","Links background to sales skills"],
+      redFlags:["\"I like helping people\" with no link to selling","Treating the job as a stopgap"]},
+    {id:"c3",category:"Motivation",question:"Where do you see yourself in 3 years?",
+      answer:"\"Top performer in my territory in year one, key account responsibility in year two, then product management or district management at FAS.\"",
+      greenFlags:["Growth path inside the company","Specific milestones per year"],
+      redFlags:["\"Doing my MBA abroad\"","No plan at all"]},
+
+    // ── Territory ──
+    {id:"t1",category:"Territory",question:"How would you plan your first 90 days in Jeddah/Makkah?",
+      answer:"Days 1–30: Master products. Map every IVF center, OB/GYN, urologist, and pharmacy chain. Segment doctors A/B/C by patient potential.\nDays 31–60: Call on A-class doctors first. Learn what they prescribe and why. Secure pharmacy stock where demand is being created.\nDays 61–90: Track pharmacy sell-out and doctor adoption, adjust call frequency, propose a CME event.\nMention Hajj/Umrah seasonal patterns in Makkah.",
+      greenFlags:["Segmentation (A/B/C)","Pharmacy coverage mentioned","Measurable targets","Local awareness (Hajj/Umrah)"],
+      redFlags:["\"I'll visit all the doctors\" (no segmentation)","No mention of pharmacies (fatal for supplements)"]},
+    {id:"t2",category:"Territory",question:"Sell me this pen / Detail this product to me.",
+      answer:"Don't pitch immediately. Ask first: \"Before I start, Doctor, what kind of patients take most of your time right now?\" Then link one benefit to their stated need, and close with a small commitment: \"Would you try it with your next two patients?\"",
+      greenFlags:["Ask questions first","One clear benefit linked to their need","Close with a specific small commitment"],
+      redFlags:["Feature dump without asking","No close at all"]},
+
+    // ── STAR ──
+    {id:"s1",category:"STAR",question:"Tell me about a time you exceeded a target. (STAR format)",
+      answer:"S: Context in one sentence.\nT: The number you had to hit.\nA: Two or three specific things you did differently.\nR: A metric — \"115% of target,\" \"3 new accounts,\" \"cut time by 40%.\"\nIf no sales history, use a project, lab target, or engagement deadline and quantify it.",
+      greenFlags:["Numbers and metrics","\"I\" not \"we\"","What you learned from it"],
+      redFlags:["Vague story with no result","Blaming others"]},
+    {id:"s2",category:"STAR",question:"A top doctor switched to a competitor. What do you do?",
+      answer:"\"I'd find out why: price, patient experience, or competitor relationship. Then address the real reason with evidence or a better-fit product from our range, and ask for one patient trial to rebuild trust. I'd also check whether pharmacies near him are in stock.\"",
+      greenFlags:["Diagnose before acting","No badmouthing of competitors","Pharmacy stock check"],
+      redFlags:["\"I'd offer him gifts\"","Attacking the competitor product"]},
+    {id:"s3",category:"STAR",question:"How do you handle rejection?",
+      answer:"\"A 'no' today is information. I note the objection, bring something new next visit, and keep the call short and useful. Doctors reward consistency.\"",
+      greenFlags:["A system for handling it","Treating rejection as data","Consistency mentioned"],
+      redFlags:["Taking it personally","Giving up on the account"]},
+
+    // ── Compliance ──
+    {id:"e1",category:"Compliance",question:"A doctor asks you to use a product outside its approved claims.",
+      answer:"\"I stay within approved claims and never position a supplement as a cure or a replacement for prescribed therapy. Any request for data beyond my materials goes to Medical Affairs.\"",
+      greenFlags:["Clear, immediate answer with no hesitation","Mentions Medical Affairs escalation"],
+      redFlags:["\"It depends\"","\"I'd tell him it works\""]},
+    {id:"e2",category:"Compliance",question:"A doctor asks for a personal favor in exchange for prescribing.",
+      answer:"\"I'd decline politely, redirect to legitimate support — CME, samples, or patient materials — and inform my manager if it recurs.\"",
+      greenFlags:["Firm and respectful","Escalation to manager mentioned","Redirects to legitimate support"],
+      redFlags:["Any hint of flexibility or willingness to comply"]},
+
+    // ── Products ──
+    {id:"p1",category:"Products",question:"Detail Inovari to a gynecologist in 60 seconds.",
+      answer:"Open with a patient question: \"How many of your PCOS patients struggle with metformin side effects?\"\nOne benefit: Insulin resistance and hormonal balance support, well tolerated.\nProgression: Mention Inovari Plus for those moving toward conception.\nClose: \"Would you try it with your next two patients?\"",
+      greenFlags:["Under 60 seconds","Patient-first opening","Closes with specific ask"],
+      redFlags:["Claiming it \"cures PCOS\"","Reading like a brochure","No close"]},
+    {id:"p2",category:"Products",question:"What is Mega-Q and who benefits?",
+      answer:"CoQ10-based supplement supporting mitochondrial function. Dual use: improves oocyte quality in women (especially pre-IVF) and sperm motility in men. Part of the couple-based fertility protocol — one of FAS's key differentiators.",
+      greenFlags:["Dual-gender use mentioned","Links to couple-based protocol","Clinical context (pre-IVF)"],
+      redFlags:["Only mentioning one gender","No clinical context"]},
+    {id:"p3",category:"Products",question:"What is Sayen and what makes it different?",
+      answer:"Tadalafil in an orally disintegrating tablet (ODT) form for erectile dysfunction and BPH. No water needed — discreet and convenient. Tadalafil's long half-life allows daily or on-demand dosing.",
+      greenFlags:["ODT form factor highlighted","Dual indication (ED + BPH)","Patient convenience angle"],
+      redFlags:["Confusing tadalafil with sildenafil","Not mentioning the ODT advantage"]},
+    {id:"p4",category:"Products",question:"How would you position the FAS fertility portfolio as a couple-based approach?",
+      answer:"FAS is the only company offering both female products (Fertiovum, Inovari, Mega-Q) and male products (ProxFORTE, Forti, Carnispeed) from one source. Pitch: \"One company, one protocol, treating the couple — not just one partner.\" Offer to brief both the OB/GYN and the andrology colleague.",
+      greenFlags:["Names specific products for each gender","Clear differentiator vs competitors","Cross-specialty engagement"],
+      redFlags:["Only discussing one gender's products","No competitive advantage stated"]},
+
+    // ── Blockbusters ──
+    {id:"b1",category:"Blockbusters",question:"GLP-1 agonists: key trial data and Saudi relevance.",
+      answer:"FAS doesn't sell these — this tests market awareness. Key data:\n• STEP-1: semaglutide 2.4 mg → ~15% weight loss\n• SURMOUNT-1: tirzepatide 15 mg → ~21% weight loss\n• SURMOUNT-5 (head-to-head): tirzepatide beat semaglutide (~20% vs ~14%)\n• SELECT: semaglutide cut major cardiovascular events ~20% in obesity+CVD\nSafety: GI effects (nausea, vomiting), dose titration, pancreatitis/gallbladder, thyroid C-cell tumor warning, lean muscle loss.\nSaudi angle: High obesity/diabetes prevalence, strong demand, supply shortages, SFDA counterfeit warnings. Pitch cardiometabolic outcomes, not aesthetics.\nBridge: \"…the same selling principle — leading with outcomes — applies to how I'd position FAS's fertility line.\"",
+      greenFlags:["Knows key trial names and numbers","Mentions safety (fair balance)","Bridges back to FAS"],
+      redFlags:["No trial data cited","Ignoring safety profile","Not bridging back to FAS"]},
+    {id:"b2",category:"Blockbusters",question:"Keytruda (pembrolizumab): what should a rep know?",
+      answer:"FAS doesn't sell Keytruda — tests oncology literacy.\nAnti-PD-1 checkpoint inhibitor. Key endpoints: OS (overall survival, gold standard) vs PFS (progression-free survival, surrogate). HR < 1 favors drug.\nAnchor trials: KEYNOTE-024 (1L NSCLC, PD-L1 ≥50%, OS benefit vs chemo), KEYNOTE-189 (combo with chemo in non-squamous NSCLC).\nSafety: Immune-related AEs — colitis, pneumonitis, thyroiditis, hepatitis.\nOncologists: Data-driven, time-poor. Know trial designs cold, never overstate subgroup results, route complex questions to MSL.\nMarket: Subcutaneous formulation coming; patent cliff ~2028.\nBridge: \"This data precision is what I'd bring to detailing FAS products.\"",
+      greenFlags:["OS vs PFS explained","Key trial names","Safety profile included","Bridges to FAS"],
+      redFlags:["Confusing OS and PFS","No safety mentioned","Overstating results"]},
+    {id:"b3",category:"Blockbusters",question:"Dupixent vs Skyrizi: mechanisms and positioning.",
+      answer:"FAS doesn't sell these — tests immunology/derm awareness.\nDupixent (dupilumab): IL-4/IL-13 blocker. Atopic dermatitis, asthma, CRSwNP, EoE, COPD. No lab monitoring. Side effects: conjunctivitis, injection-site reactions.\nSkyrizi (risankizumab): IL-23 blocker. Psoriasis, PsA, Crohn's, UC. q12w dosing in psoriasis. SEQUENCE trial vs Stelara in Crohn's.\nQoL positioning: Lead with DLQI, itch, sleep, work productivity — not just clearance.\nSaudi access: MOH/NUPCO formulary, CHI pre-authorization. Pitch total cost of care.\nBridge: \"Helping doctors with formulary/pre-auth — exactly the support I'd provide at FAS.\"",
+      greenFlags:["Correct mechanisms","QoL angle","Market access knowledge","Bridges to FAS"],
+      redFlags:["Confusing mechanisms","Only citing efficacy","No Saudi market context"]},
+
+    // ── Background (uses PROFILE tokens) ──
+    {id:"bg1",category:"Background",question:"Walk me through your background.",
+      answer:"\"I graduated with a {{DEGREE}} from {{UNIVERSITY}} {{HONORS}}. For the past {{MONTHS_EXPERIENCE}}, I've been working at {{CURRENT_EMPLOYER}}, where I counsel patients daily on medications, manage inventory, and handle insurance queries. That experience taught me to translate clinical information into language patients understand — which is exactly the core skill of a medical representative, except the audience is a physician and the goal is informed prescribing.\"",
+      greenFlags:["Concise chronology","Links pharmacy skills to rep skills","Shows you understand the job"],
+      redFlags:["Rambling with irrelevant details","No connection to why you'd be a good rep"]},
+    {id:"bg2",category:"Background",question:"Tell me about a time you handled a difficult patient/customer.",
+      answer:"\"At {{CURRENT_EMPLOYER}}, a patient came in upset because their insurance rejected a medication. S: They were confrontational. T: I needed to resolve it without escalating. A: I acknowledged their frustration, called the insurance company, found an alternative on formulary, and explained the switch clearly. R: Patient calmed down, left with their medication, and specifically asked for me on their next visit.\nBridge: That's exactly how I'd handle a skeptical doctor — acknowledge, investigate, offer a solution.\"",
+      greenFlags:["STAR structure","De-escalation shown","Bridges to doctor interactions"],
+      redFlags:["No resolution","Blaming the patient"]},
+    {id:"bg3",category:"Background",question:"Describe a time you caught an error or drug interaction.",
+      answer:"\"At {{CURRENT_EMPLOYER}}, I noticed a prescription for warfarin alongside a newly prescribed antibiotic that significantly increases INR. S: The patient was at bleeding risk. T: I needed to alert the physician without overstepping. A: I called the prescriber, cited the interaction, and suggested an alternative antibiotic. R: The doctor thanked me and changed the prescription.\nBridge: This is the compliance mindset I'd bring to FAS — escalate, don't override. I'd channel questions beyond my materials to Medical Affairs the same way.\"",
+      greenFlags:["Specific clinical detail","Escalated properly","Bridges to compliance culture"],
+      redFlags:["Overriding the doctor","Vague story with no drug names"]},
+    {id:"bg4",category:"Background",question:"What are you most proud of academically or professionally?",
+      answer:"\"Graduating with a {{DEGREE}} {{HONORS}} from {{UNIVERSITY}} while managing a demanding clinical rotation schedule. It taught me that performance under pressure comes from preparation and prioritization — not from cutting corners. That's the same mindset I'd bring to managing a territory: plan the week, prioritize A-class accounts, and prepare before every call.\"",
+      greenFlags:["Ties achievement to practical skill","Shows work ethic","Connects to job requirements"],
+      redFlags:["Just stating the grade with no insight","Arrogance"]},
+    {id:"bg5",category:"Background",question:"How do you handle a high-pressure, multitasking environment?",
+      answer:"\"At {{CURRENT_EMPLOYER}}, I regularly juggle prescription verification, patient counseling, inventory management, and insurance calls simultaneously. I triage by clinical urgency — a drug interaction flag gets handled before an inventory count. I use checklists and I don't rely on memory for anything critical.\nBridge: Managing a territory with multiple accounts, call schedules, and sample tracking is the same triage skill applied to a bigger map.\"",
+      greenFlags:["Concrete examples","Triage system described","Bridges to territory management"],
+      redFlags:["\"I just stay calm\" with no method","No connection to the rep role"]},
+  ],
+
+  objections: [
+    {id:"o1",objection:"\"The 2023 PCOS guideline says inositol is experimental.\"",context:"A gynecologist challenges you while detailing Inovari.",
+      modelAnswer:"Acknowledge: \"You're right, Doctor — the guideline calls for more evidence and shared decision-making.\"\nAsk: \"How many of your PCOS patients can't tolerate metformin or prefer a non-drug option?\"\nPivot: \"For those patients specifically, inositol gives you a well-tolerated tool within shared decision-making.\"\nEvidence: \"The 40:1 myo- to D-chiro-inositol ratio in Inovari is the most studied formulation.\"\nClose: \"Would you consider trying it with your next two metformin-intolerant patients?\"\nCompliance: Never argue with the guideline. Never claim it cures PCOS."},
+    {id:"o2",objection:"\"Every company has a fertility supplement. Why yours?\"",context:"An IVF specialist is skeptical about differentiation.",
+      modelAnswer:"Acknowledge: \"You're right, there are many options.\"\nAsk: \"Are you currently using separate male and female products from different companies?\"\nPivot: \"FAS is the only company offering a complete couple-based protocol — female AND male products from one source, with IVF heritage since 1999.\"\nEvidence: \"One company coordinating both sides means consistent quality and streamlined ordering.\"\nClose: \"Can I arrange a brief session with your andrology colleague to show the full protocol?\"\nCompliance: Differentiate on protocol approach, not by disparaging competitors."},
+    {id:"o3",objection:"\"My patients can't afford supplements.\"",context:"A doctor in a lower-income area pushes back on cost.",
+      modelAnswer:"Acknowledge: \"I completely understand, Doctor. Cost is a real barrier.\"\nAsk: \"Which patients would benefit most — perhaps those heading into IVF?\"\nPivot: \"A failed IVF cycle costs 15,000–25,000 SAR. A 3-month supplement course is a fraction of that and may improve outcomes.\"\nEvidence: \"Optimizing gamete quality before IVF can reduce cycle failures.\"\nClose: \"For your next IVF-track patient, would you consider a targeted 3-month course?\"\nCompliance: Never promise IVF success. Frame as supportive, not curative."},
+    {id:"o4",objection:"\"I only have two minutes.\"",context:"A busy doctor between patients.",
+      modelAnswer:"Acknowledge: \"Absolutely, Doctor — I respect your time.\"\nOne point: \"One thing only: Inovari gives your metformin-intolerant PCOS patients an alternative that's well tolerated.\"\nClose: \"Here's a one-page summary. Can I schedule five minutes when it's quieter to show you the data?\"\nCompliance: Keep it genuinely short. Respecting time wins the next visit."},
+    {id:"o5",objection:"\"Metformin works fine for my PCOS patients. Why would I change?\"",context:"A gynecologist satisfied with current treatment.",
+      modelAnswer:"Acknowledge: \"Metformin is a strong first-line choice, and I wouldn't suggest replacing it.\"\nAsk: \"What percentage of your patients report GI side effects or discontinue?\"\nPivot: \"For those patients — the ones who drop off — Inovari is an option without the GI burden.\"\nEvidence: \"It's not either/or; some physicians use both together.\"\nClose: \"Would you try Inovari as an add-on or alternative for your next patient who discontinues metformin?\"\nCompliance: Never position as superior to metformin."},
+    {id:"o6",objection:"\"I don't believe in supplements.\"",context:"A skeptical specialist dismisses the whole category.",
+      modelAnswer:"Acknowledge: \"I respect that, Doctor. Healthy skepticism protects patients.\"\nAsk: \"What evidence standard would make you comfortable recommending one?\"\nPivot: \"These aren't general wellness supplements — they're targeted nutraceuticals with specific formulations studied in reproductive medicine.\"\nEvidence: \"The myo-inositol 40:1 ratio has published data in PCOS populations.\"\nClose: \"I'd love to leave you the key studies. If the data meets your standard, would you consider a trial with one patient?\"\nCompliance: Respect their position. Let the data do the work."},
+    {id:"o7",objection:"\"Your rep before you never followed up.\"",context:"Doctor had a bad experience with the previous FAS representative.",
+      modelAnswer:"Acknowledge: \"I'm sorry about that, Doctor. That's not the standard I hold myself to.\"\nAsk: \"What would good follow-up look like for your practice?\"\nPivot: \"I commit to a regular call schedule — and if I say I'll bring something, I'll bring it.\"\nEvidence: \"Here's my direct number. I'd rather you call me out than let it slide.\"\nClose: \"Can I earn back your time with a clean start? One visit with the data you need, then you judge.\"\nCompliance: Don't blame the previous rep. Own the relationship going forward."},
+  ],
+
+  bossFight: {
+    doctorName:"Dr. Al-Harbi",doctorTitle:"Senior IVF Consultant",
+    intro:"You walk into the office of Dr. Al-Harbi, one of the most influential IVF specialists in Jeddah. He's busy, skeptical, and has heard every sales pitch. You have 5 rounds to earn his trust and secure a commitment.",
+    rounds:[
+      {doctorSays:"\"Make it quick. I have patients in 10 minutes. What do you want?\"",
+        options:[
+          {text:"\"Doctor, before I take your time — what's the biggest challenge you're seeing with your PCOS patients right now?\"",trust:15,patience:-5,feedback:"Excellent — needs discovery first. You're learning before pitching, and showing respect for his expertise."},
+          {text:"\"Let me tell you about Inovari — it's our PCOS product with myo-inositol in a 40:1 ratio that supports insulin resistance...\"",trust:-5,patience:-15,feedback:"Too fast. You launched into features without asking what he cares about. He's already tuning out."},
+          {text:"\"I know you're busy, so I'll just leave some samples and brochures. Can I come back another time?\"",trust:-10,patience:5,feedback:"You avoided the conversation entirely. He won't remember you, and you wasted the visit."},
+          {text:"\"I'm the new FAS rep. We have the best fertility products on the market and I'd love to partner with you.\"",trust:-10,patience:-10,feedback:"Empty claims. 'Best on the market' means nothing without evidence."}]},
+      {doctorSays:"\"Hmm, I see a lot of PCOS. But the 2023 guideline says inositol evidence is still limited. Why should I bother?\"",
+        options:[
+          {text:"\"You're right — the guideline calls for shared decision-making. But how many of your patients can't tolerate metformin? For those, this gives you a well-tolerated option within that framework.\"",trust:20,patience:-5,feedback:"Perfect. You agreed with the guideline, positioned for a specific patient subset, and stayed within the evidence framework."},
+          {text:"\"Actually, Doctor, that guideline is outdated. There's plenty of evidence now that inositol works better than they suggest.\"",trust:-20,patience:-10,feedback:"Never argue with a guideline to a specialist. You just lost credibility."},
+          {text:"\"I understand. Let me leave you some studies and follow up next week.\"",trust:5,patience:0,feedback:"Acceptable but passive. You didn't make a case in this visit. The studies may end up unread."}]},
+      {doctorSays:"\"Every supplement company sends someone in here. You're the third one this month. What makes yours different?\"",
+        options:[
+          {text:"\"Fair point. The difference is FAS covers both partners — female AND male fertility products from one company, with IVF heritage since 1999. I can brief your andrology colleague too.\"",trust:20,patience:-5,feedback:"Strong differentiator: couple-based protocol from one source, plus offering to engage the andrology colleague shows initiative."},
+          {text:"\"Our products are higher quality than the competition. We manufacture locally and have better formulations.\"",trust:-5,patience:-10,feedback:"'Higher quality' without evidence is a claim, not a differentiator. You implied competitors are lower quality."},
+          {text:"\"I understand the fatigue. Would you prefer I come back when you have more time?\"",trust:-15,patience:5,feedback:"You folded at the first resistance. He was testing you. A good rep has an answer ready."}]},
+      {doctorSays:"\"Some of my patients struggle with cost. These supplements aren't cheap, and insurance doesn't always cover them.\"",
+        options:[
+          {text:"\"That's a real concern. But a failed IVF cycle costs 15,000–25,000 SAR. A 3-month supplement course is a fraction of that. For IVF-track patients, optimizing gamete quality upfront could save them a cycle.\"",trust:15,patience:-5,feedback:"Excellent value reframing. You acknowledged the concern, then showed the cost in context of the alternative."},
+          {text:"\"I can arrange a special discount for your patients if you prescribe a certain volume.\"",trust:-25,patience:-10,feedback:"COMPLIANCE FAIL. You offered a volume-based discount incentive. This is an ethical violation."},
+          {text:"\"You're right, cost is tough. Which patients would you prioritize?\"",trust:10,patience:0,feedback:"Good empathy and segmentation, but you missed the chance to reframe the value proposition."}]},
+      {doctorSays:"\"Alright, you've been reasonable. But I'm not committing to anything today. What exactly do you want from me?\"",
+        options:[
+          {text:"\"Just one thing: your next metformin-intolerant PCOS patient — would you consider trying Inovari and let me follow up on how it went? One patient, one trial.\"",trust:20,patience:0,feedback:"Perfect close: specific, small, measurable, and patient-centered."},
+          {text:"\"I'd like you to start prescribing Inovari to all your PCOS patients. Can I count on your support?\"",trust:-20,patience:-15,feedback:"Way too aggressive. 'All your patients' is unrealistic and presumptuous."},
+          {text:"\"No pressure, Doctor. I'll just leave materials and check back sometime.\"",trust:-10,patience:5,feedback:"You had the opening and didn't close. He gave you permission to ask, and you wasted it."},
+          {text:"\"Would you be open to a CME session at your center? I can coordinate with the Faisal Al-Saadoun Academy.\"",trust:10,patience:-5,feedback:"Good — CME adds value and is compliant. But you didn't make a direct product ask. Best used alongside a trial request."}]}
+    ]
+  },
+
+  arabicDrill: [
+    {english:"Which products are the priority for this territory?",arabic:"ما هي المنتجات ذات الأولوية لهذه المنطقة تحديدًا؟"},
+    {english:"Is the focus on fertility centers and OB/GYN, or also urology and pharmacies?",arabic:"هل التركيز الأكبر على مراكز الإخصاب وعيادات النساء والولادة، أم يشمل أيضًا المسالك البولية والصيدليات؟"},
+    {english:"What does product training look like for a new rep?",arabic:"كيف يكون برنامج التدريب على المنتجات للمندوب الجديد؟"},
+    {english:"Which KPIs measure a rep's success in the first six months?",arabic:"ما هي مؤشرات الأداء التي تقيسون بها نجاح المندوب في أول ستة أشهر؟"},
+    {english:"I'd like to introduce myself — I'm the new medical representative for this area.",arabic:"أحب أعرّف بنفسي — أنا المندوب الطبي الجديد لهذه المنطقة."},
+    {english:"Could you tell me about your current prescribing habits for PCOS?",arabic:"ممكن تخبرني عن عاداتك الحالية في وصف الأدوية لمريضات تكيّس المبايض؟"},
+    {english:"Thank you for your time, Doctor. When would be a good time to follow up?",arabic:"شكرًا على وقتك يا دكتور. متى يكون وقت مناسب للمتابعة؟"},
+    {english:"We offer continuous medical education through the Faisal Al-Saadoun Academy.",arabic:"نقدّم التعليم الطبي المستمر من خلال أكاديمية فيصل السعدون."},
+  ],
+
+  levels:[
+    {name:"Trainee",minXP:0,icon:"📋"},
+    {name:"Rep",minXP:200,icon:"💼"},
+    {name:"Senior Rep",minXP:500,icon:"⭐"},
+    {name:"Key Account Manager",minXP:1000,icon:"🏆"},
+    {name:"District Manager",minXP:2000,icon:"👑"},
+  ],
+
+  products:{
+    womensHealth:[
+      {name:"Inovari",use:"PCOS — insulin resistance & hormonal balance support"},
+      {name:"Inovari Plus",use:"PCOS progressing toward conception"},
+      {name:"REVEAL",use:"PCOS — metabolic and hormonal support"},
+      {name:"Fertiovum",use:"Ovule/oocyte quality enhancement"},
+      {name:"Prox-Fem",use:"Female fertility — oocyte quality"},
+      {name:"Mega-Q",use:"Oocyte mitochondrial support / sperm motility"},
+      {name:"Natal",use:"Pregnancy — DHA + 20 vitamins/minerals"},
+      {name:"HemoFER 40",use:"Iron deficiency / iron-deficiency anemia"},
+    ],
+    mensHealth:[
+      {name:"ProxFORTE",use:"Sperm count, motility & morphology"},
+      {name:"Forti",use:"Male fertility support"},
+      {name:"Carnispeed",use:"Sperm motility enhancement"},
+      {name:"Sayen",use:"Tadalafil ODT — ED and BPH"},
+      {name:"Dapoxetine",use:"Premature ejaculation (on-demand SSRI)"},
+    ],
+    devices:[
+      {name:"Surgical sutures",use:"Wound closure"},
+      {name:"Surgical staplers",use:"Tissue approximation"},
+      {name:"Hemostatic agents",use:"Intraoperative bleeding control"},
+    ]
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+function loadState(){
+  try{const s=localStorage.getItem('repArenaState');if(s)return JSON.parse(s)}catch{}
+  return defaultState();
+}
+function defaultState(){
+  const cs={};
+  CONTENT.flashCards.forEach(c=>{cs[c.id]={box:1,attempts:0,totalScore:0,lastSeen:0}});
+  CONTENT.objections.forEach(o=>{cs[o.id]={attempts:0,totalScore:0,bestScore:0}});
+  CONTENT.arabicDrill.forEach((_,i)=>{cs['ar_'+i]={box:1,attempts:0,totalScore:0,lastSeen:0}});
+  return{xp:0,streak:0,lastPlayDate:null,cardStates:cs,gauntletBestRun:0,bossCompleted:false,bossBestTrust:0};
+}
+let S=loadState();
+function save(){try{localStorage.setItem('repArenaState',JSON.stringify(S))}catch{}}
+function addXP(n){S.xp+=n;save()}
+function getLevel(){let l=CONTENT.levels[0];for(const x of CONTENT.levels)if(S.xp>=x.minXP)l=x;return l}
+function getNextLevel(){const c=getLevel();const i=CONTENT.levels.indexOf(c);return i<CONTENT.levels.length-1?CONTENT.levels[i+1]:null}
+function getXPPct(){const c=getLevel(),n=getNextLevel();if(!n)return 100;return Math.min(100,(S.xp-c.minXP)/(n.minXP-c.minXP)*100)}
+function updateStreak(){
+  const today=new Date().toISOString().split('T')[0];
+  if(S.lastPlayDate===today)return;
+  const yesterday=new Date(Date.now()-864e5).toISOString().split('T')[0];
+  S.streak=S.lastPlayDate===yesterday?S.streak+1:1;
+  S.lastPlayDate=today;save();
+}
+function getWeakSpots(){
+  const items=[];
+  CONTENT.flashCards.forEach(c=>{const s=S.cardStates[c.id];if(s&&s.attempts>0)items.push({id:c.id,type:'flash',label:c.question.slice(0,45)+'…',avg:s.totalScore/s.attempts,cat:c.category})});
+  CONTENT.objections.forEach(o=>{const s=S.cardStates[o.id];if(s&&s.attempts>0)items.push({id:o.id,type:'objection',label:o.objection.slice(0,45)+'…',avg:s.totalScore/s.attempts,cat:'Objection'})});
+  items.sort((a,b)=>a.avg-b.avg);return items.slice(0,5);
+}
+function ensureCardState(id,type){
+  if(!S.cardStates[id]){
+    S.cardStates[id]=type==='flash'||type==='arabic'?{box:1,attempts:0,totalScore:0,lastSeen:0}:{attempts:0,totalScore:0,bestScore:0};
+    save();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+const $=document.getElementById.bind(document);
+const app=$('app');
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function render(h){app.innerHTML=h}
+
+function hdr(showBack){
+  const lv=getLevel(),nx=getNextLevel(),pct=getXPPct();
+  const streak=S.streak>0?`<span class="text-warn font-bold text-sm">🔥${S.streak}</span>`:'';
+  return`<header class="bg-surface/90 backdrop-blur-md border-b border-border sticky top-0 z-50">
+  <div class="max-w-lg mx-auto px-4 py-2.5">
+    <div class="flex items-center justify-between mb-1.5">
+      <div class="flex items-center gap-2">
+        ${showBack?`<button onclick="window._nav('home')" class="p-2 -ml-2 text-muted active:text-white" aria-label="Back"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>`:''}
+        <span class="font-bold text-white">Rep Arena</span>
+      </div>
+      <div class="flex items-center gap-2">${streak}<span class="text-xs text-muted">${lv.icon} ${lv.name}</span></div>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="flex-1 h-1.5 bg-bg rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-accent to-accentGlow rounded-full xp-fill" style="width:${pct}%"></div></div>
+      <span class="text-[11px] text-muted tabular-nums">${S.xp}${nx?' / '+nx.minXP:' MAX'}</span>
+    </div>
+  </div></header>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+window._nav=function(screen,arg){
+  clearInterval(window._timerInterval);
+  switch(screen){
+    case'home':showHome();break;
+    case'flash':startFlash(arg);break;
+    case'gauntlet':startGauntlet(arg);break;
+    case'boss':startBoss();break;
+    case'arabic':startArabic();break;
+    case'mock':startMock();break;
+    case'weakspots':drillWeakSpots();break;
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// HOME
+// ═══════════════════════════════════════════════════════
+function showHome(){
+  updateStreak();
+  const ws=getWeakSpots();
+  render(`${hdr(false)}
+  <main class="max-w-lg mx-auto px-4 py-5 pb-6 space-y-3">
+    <button class="mode-card" onclick="_nav('flash')">
+      <div class="flex items-center gap-3 mb-1"><span class="text-xl">🧠</span><span class="font-bold text-white">Flash Recall</span></div>
+      <p class="text-sm text-muted">Spaced repetition. ${CONTENT.flashCards.length} cards, 8 categories.</p>
+    </button>
+    <button class="mode-card" onclick="_nav('gauntlet')">
+      <div class="flex items-center gap-3 mb-1"><span class="text-xl">⚡</span><span class="font-bold text-white">Objection Gauntlet</span></div>
+      <p class="text-sm text-muted">45s timer. Handle doctor objections under pressure.</p>
+      <p class="text-xs text-danger mt-1">Best run: ${S.gauntletBestRun} pts</p>
+    </button>
+    <button class="mode-card" onclick="_nav('boss')">
+      <div class="flex items-center gap-3 mb-1"><span class="text-xl">👨‍⚕️</span><span class="font-bold text-white">Boss Fight</span></div>
+      <p class="text-sm text-muted">Dr. Al-Harbi, Senior IVF Consultant. 5 rounds.</p>
+      <p class="text-xs text-warn mt-1">Best trust: ${S.bossBestTrust}%</p>
+    </button>
+    <button class="mode-card" onclick="_nav('arabic')">
+      <div class="flex items-center gap-3 mb-1"><span class="text-xl">🗣️</span><span class="font-bold text-white">Arabic Drill</span></div>
+      <p class="text-sm text-muted">${CONTENT.arabicDrill.length} professional phrases, Saudi register.</p>
+    </button>
+    <button class="mode-card" onclick="_nav('mock')" style="background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.12));border-color:rgba(99,102,241,.3)">
+      <div class="flex items-center gap-3 mb-1"><span class="text-xl">🎯</span><span class="font-bold text-white">Final Mock</span></div>
+      <p class="text-sm text-muted">10-minute mixed test. Get your readiness score.</p>
+    </button>
+
+    ${ws.length?`<div class="card">
+      <div class="flex items-center justify-between mb-3">
+        <span class="font-bold text-white text-sm">🎯 Weak Spots</span>
+        <button onclick="_nav('weakspots')" class="text-xs text-accent font-semibold px-3 py-1.5 rounded-lg bg-accent/10 active:bg-accent/20">Drill These</button>
+      </div>
+      ${ws.map(w=>`<div class="flex items-center justify-between text-sm py-1">
+        <span class="text-muted truncate flex-1 mr-2 text-xs">${esc(w.label)}</span>
+        <span class="badge ${w.avg<2?'bg-danger/20 text-danger':'bg-warn/20 text-warn'} text-[11px]">${w.avg.toFixed(1)}</span>
+      </div>`).join('')}
+    </div>`:''}
+
+    <details class="card"><summary class="font-bold text-white text-sm cursor-pointer">📦 Product Reference</summary>
+      <div class="mt-3 space-y-3">
+        <div><div class="text-xs text-accent font-semibold mb-1.5">Women's Health (~50%)</div>
+          ${CONTENT.products.womensHealth.map(p=>`<div class="py-1.5 border-b border-border/50 last:border-0"><span class="text-sm font-medium text-white">${p.name}</span><span class="text-xs text-muted ml-2">${p.use}</span></div>`).join('')}
+        </div>
+        <div><div class="text-xs text-accent font-semibold mb-1.5">Men's Health (~30%)</div>
+          ${CONTENT.products.mensHealth.map(p=>`<div class="py-1.5 border-b border-border/50 last:border-0"><span class="text-sm font-medium text-white">${p.name}</span><span class="text-xs text-muted ml-2">${p.use}</span></div>`).join('')}
+        </div>
+        <div><div class="text-xs text-accent font-semibold mb-1.5">Devices (~15%)</div>
+          ${CONTENT.products.devices.map(p=>`<div class="py-1.5 border-b border-border/50 last:border-0"><span class="text-sm font-medium text-white">${p.name}</span><span class="text-xs text-muted ml-2">${p.use}</span></div>`).join('')}
+        </div>
+      </div>
+    </details>
+    <p class="text-center text-[11px] text-muted py-2">Keyboard shortcuts: Space=reveal · 1-4=score · Enter=next</p>
+  </main>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// FLASH RECALL
+// ═══════════════════════════════════════════════════════
+let FQ=[],FI=0,FR=false;
+
+function startFlash(cardIds){
+  let cards=cardIds?CONTENT.flashCards.filter(c=>cardIds.includes(c.id)):[...CONTENT.flashCards];
+  cards.forEach(c=>ensureCardState(c.id,'flash'));
+  cards.sort((a,b)=>{const sa=S.cardStates[a.id],sb=S.cardStates[b.id];return sa.box!==sb.box?sa.box-sb.box:sa.lastSeen-sb.lastSeen});
+  FQ=cards;FI=0;FR=false;renderFlash();
+}
+
+function renderFlash(){
+  if(FI>=FQ.length){render(`${hdr(true)}<main class="max-w-lg mx-auto px-4 py-12 text-center slide-up">
+    <div class="text-5xl mb-3">🎉</div><h2 class="text-xl font-bold text-white mb-2">Session Complete!</h2>
+    <p class="text-muted text-sm mb-6">${FQ.length} cards reviewed.</p>
+    <div class="space-y-3 max-w-xs mx-auto"><button onclick="_nav('flash')" class="btn-action btn-primary">Go Again</button>
+    <button onclick="_nav('home')" class="btn-action btn-secondary">Home</button></div>
+  </main>`);return}
+  const c=FQ[FI],cs=S.cardStates[c.id],boxes=[1,2,3,4,5].map(b=>`<div class="w-6 h-1.5 rounded-full ${b<=cs.box?'bg-accent':'bg-bg'}"></div>`).join('');
+  const answerText=resolveTokens(c.answer);
+
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-4 ${FR?'pb-4':'pb-28'}">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-accent/20 text-accentGlow text-xs">${c.category}</span>
+      <span class="text-xs text-muted">${FI+1} / ${FQ.length}</span>
+    </div>
+    <div class="flex gap-1 mb-4">${boxes}</div>
+    <div class="card mb-4 slide-up"><h2 class="text-base font-bold text-white leading-relaxed">${esc(c.question)}</h2></div>
+    ${FR?`<div class="space-y-3 fade-in">
+      <div class="card"><div class="text-xs text-accent font-semibold mb-2">Model Answer</div>
+        <div class="text-sm text-gray-300 whitespace-pre-line leading-relaxed">${esc(answerText)}</div></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="bg-success/10 border border-success/20 rounded-xl p-3">
+          <div class="text-[11px] font-semibold text-success mb-1.5">GREEN FLAGS</div>
+          ${c.greenFlags.map(f=>`<div class="text-xs text-gray-300 flex gap-1.5 mb-1"><span class="text-success">✓</span>${esc(f)}</div>`).join('')}
+        </div>
+        <div class="bg-danger/10 border border-danger/20 rounded-xl p-3">
+          <div class="text-[11px] font-semibold text-danger mb-1.5">RED FLAGS</div>
+          ${c.redFlags.map(f=>`<div class="text-xs text-gray-300 flex gap-1.5 mb-1"><span class="text-danger">✗</span>${esc(f)}</div>`).join('')}
+        </div>
+      </div>
+      <div class="text-center text-xs text-muted mt-1 mb-1">How did you do?</div>
+      <div class="grid grid-cols-4 gap-2">
+        <button onclick="window._scoreFlash(1)" class="btn-action btn-danger flex-col !gap-0 !py-3"><span class="text-lg font-bold">1</span><span class="text-[11px]">Blank</span></button>
+        <button onclick="window._scoreFlash(2)" class="btn-action btn-warn flex-col !gap-0 !py-3"><span class="text-lg font-bold">2</span><span class="text-[11px]">Partial</span></button>
+        <button onclick="window._scoreFlash(3)" class="btn-action btn-accent flex-col !gap-0 !py-3"><span class="text-lg font-bold">3</span><span class="text-[11px]">Good</span></button>
+        <button onclick="window._scoreFlash(4)" class="btn-action btn-success flex-col !gap-0 !py-3"><span class="text-lg font-bold">4</span><span class="text-[11px]">Nailed it</span></button>
+      </div>
+    </div>`:`<p class="text-center text-sm text-muted">Answer aloud, then reveal.</p>`}
+  </main>
+  ${FR?'':`<div class="bottom-bar"><div class="max-w-lg mx-auto">
+    <button onclick="window._revealFlash()" class="btn-action btn-primary text-base">Reveal Answer</button>
+  </div></div>`}`);
+}
+
+window._revealFlash=()=>{if(!FR){FR=true;renderFlash()}};
+window._scoreFlash=(score)=>{
+  const c=FQ[FI],cs=S.cardStates[c.id];
+  cs.attempts++;cs.totalScore+=score;cs.lastSeen=Date.now();
+  if(score<=2){cs.box=1;if(FI<FQ.length-1)FQ.splice(Math.min(FI+3,FQ.length),0,c)}
+  else cs.box=Math.min(5,cs.box+1);
+  addXP([0,2,5,10,15][score]);
+  FI++;FR=false;renderFlash();
+};
+
+// ═══════════════════════════════════════════════════════
+// OBJECTION GAUNTLET
+// ═══════════════════════════════════════════════════════
+let GQ=[],GI=0,GPhase='',GTime=45,GUsed=0,GRun=0,GFast=false;
+
+function startGauntlet(ids){
+  GRun=0;GI=0;
+  GQ=ids?CONTENT.objections.filter(o=>ids.includes(o.id)):[...CONTENT.objections].sort(()=>Math.random()-.5).slice(0,5);
+  if(!GQ.length){showHome();return}
+  GQ.forEach(o=>ensureCardState(o.id,'objection'));
+  nextGauntlet();
+}
+
+function nextGauntlet(){
+  GPhase='answering';GTime=45;GUsed=0;GFast=false;
+  clearInterval(window._timerInterval);
+  window._timerInterval=setInterval(()=>{
+    GTime--;GUsed++;
+    const el=document.getElementById('g-timer');
+    if(el){el.textContent=GTime+'s';el.className=`text-4xl font-bold tabular-nums ${GTime<=10?'text-danger timer-pulse':'text-white'}`}
+    const bar=document.getElementById('g-bar');
+    if(bar)bar.style.width=(GTime/45*100)+'%';
+    if(GTime<=0){clearInterval(window._timerInterval);GUsed=45;showGauntletScore()}
+  },1000);
+  renderGauntletQ();
+}
+
+function renderGauntletQ(){
+  const o=GQ[GI];
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-28">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-danger/20 text-danger text-xs">Objection ${GI+1}/${GQ.length}</span>
+      <span class="text-xs text-muted">Run: ${GRun} pts</span>
+    </div>
+    <div class="text-center mb-4">
+      <div id="g-timer" class="text-4xl font-bold tabular-nums text-white">${GTime}s</div>
+      <div class="w-full h-2 bg-bg rounded-full mt-2 overflow-hidden">
+        <div id="g-bar" class="h-full bg-accent rounded-full transition-all duration-1000" style="width:${GTime/45*100}%"></div>
+      </div>
+    </div>
+    <div class="card slide-up"><div class="text-xs text-muted mb-2">${esc(o.context)}</div>
+      <h2 class="text-base font-bold text-white leading-relaxed">${esc(o.objection)}</h2>
+    </div>
+    <p class="text-center text-sm text-muted mt-4">Answer aloud, then tap Done.</p>
+  </main>
+  <div class="bottom-bar"><div class="max-w-lg mx-auto">
+    <button onclick="window._gauntletDone()" class="btn-action btn-primary text-base">Done</button>
+  </div></div>`);
+}
+
+window._gauntletDone=()=>{
+  if(GPhase!=='answering')return;
+  clearInterval(window._timerInterval);
+  GFast=GUsed<30;showGauntletScore();
+};
+
+function showGauntletScore(){
+  GPhase='scoring';const o=GQ[GI];
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-28">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-danger/20 text-danger text-xs">Score Yourself</span>
+      ${GFast?'<span class="text-xs text-success font-semibold">⚡ Speed bonus</span>':''}
+    </div>
+    <div class="card mb-3"><div class="text-xs text-accent font-semibold mb-2">Model Answer</div>
+      <div class="text-xs text-gray-300 whitespace-pre-line leading-relaxed">${esc(o.modelAnswer)}</div></div>
+    <div class="card mb-3 space-y-1">
+      <div class="text-xs text-white font-semibold mb-2">Check what you covered:</div>
+      <label class="checkbox-row"><input type="checkbox" id="gc_ack"><span class="text-sm text-gray-300">Acknowledged the objection</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="gc_ask"><span class="text-sm text-gray-300">Asked a question</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="gc_piv"><span class="text-sm text-gray-300">Pivoted to patient benefit</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="gc_evi"><span class="text-sm text-gray-300">Used evidence or data</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="gc_cls"><span class="text-sm text-gray-300">Made a small, specific close</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="gc_cmp"><span class="text-sm text-gray-300">Stayed compliant</span></label>
+    </div>
+  </main>
+  <div class="bottom-bar"><div class="max-w-lg mx-auto">
+    <button onclick="window._submitGauntlet()" class="btn-action btn-primary text-base">Submit Score</button>
+  </div></div>`);
+}
+
+window._submitGauntlet=()=>{
+  const compliant=document.getElementById('gc_cmp')?.checked;
+  if(!compliant){
+    const o=GQ[GI],cs=S.cardStates[o.id];cs.attempts++;save();
+    render(`${hdr(true)}<main class="max-w-lg mx-auto px-4 py-10 text-center slide-up">
+      <div class="card shake" style="border-color:rgba(239,68,68,.5)">
+        <div class="text-4xl mb-2">🚨</div>
+        <h2 class="text-xl font-bold text-danger mb-2">COMPLIANCE FAIL</h2>
+        <p class="text-sm text-gray-300 mb-1">Score capped at 0.</p>
+        <p class="text-xs text-muted">Never claim cures, never bash competitors, always stay within approved claims.</p>
+      </div>
+      <button onclick="window._nextGauntlet()" class="btn-action btn-primary mt-6 max-w-xs mx-auto">${GI+1>=GQ.length?'See Results':'Next Objection'}</button>
+    </main>`);
+    return;
+  }
+  let count=0;
+  ['gc_ack','gc_ask','gc_piv','gc_evi','gc_cls','gc_cmp'].forEach(id=>{if(document.getElementById(id)?.checked)count++});
+  let score=count*10+(GFast?10:0);
+  GRun+=score;
+  const o=GQ[GI],cs=S.cardStates[o.id];
+  cs.attempts++;cs.totalScore+=score;cs.bestScore=Math.max(cs.bestScore||0,score);
+  addXP(Math.round(score/2));
+  window._nextGauntlet();
+};
+
+window._nextGauntlet=()=>{
+  GI++;
+  if(GI>=GQ.length){
+    S.gauntletBestRun=Math.max(S.gauntletBestRun,GRun);save();
+    const maxS=GQ.length*70,pct=Math.round(GRun/maxS*100);
+    render(`${hdr(true)}<main class="max-w-lg mx-auto px-4 py-10 text-center slide-up">
+      <div class="text-5xl mb-3">${pct>=80?'🏆':pct>=50?'💪':'📚'}</div>
+      <h2 class="text-xl font-bold text-white mb-1">Gauntlet Complete!</h2>
+      <div class="text-4xl font-bold ${pct>=80?'text-success':pct>=50?'text-warn':'text-danger'} my-2">${GRun} pts</div>
+      <p class="text-sm text-muted mb-1">${pct}% of maximum</p>
+      <p class="text-xs text-muted mb-6">Best run: ${S.gauntletBestRun} pts</p>
+      <div class="space-y-3 max-w-xs mx-auto">
+        <button onclick="_nav('gauntlet')" class="btn-action btn-primary">Run Again</button>
+        <button onclick="_nav('home')" class="btn-action btn-secondary">Home</button>
+      </div>
+    </main>`);
+  } else nextGauntlet();
+};
+
+// ═══════════════════════════════════════════════════════
+// BOSS FIGHT
+// ═══════════════════════════════════════════════════════
+let BR=0,BT=30,BP=100,BC=[];
+
+function startBoss(){BR=0;BT=30;BP=100;BC=[];renderBoss()}
+
+function renderBoss(){
+  if(BR>=CONTENT.bossFight.rounds.length){showBossDebrief();return}
+  const r=CONTENT.bossFight.rounds[BR],tp=Math.max(0,Math.min(100,BT)),pp=Math.max(0,Math.min(100,BP));
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-6">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-lg">👨‍⚕️</span>
+        <div><div class="text-sm font-bold text-white">${CONTENT.bossFight.doctorName}</div><div class="text-[11px] text-muted">${CONTENT.bossFight.doctorTitle}</div></div>
+      </div>
+      <span class="text-xs text-muted">Round ${BR+1}/${CONTENT.bossFight.rounds.length}</span>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-4">
+      <div><div class="flex justify-between mb-1"><span class="text-[11px] text-muted">Trust</span><span class="text-[11px] font-bold ${tp>=70?'text-success':tp>=40?'text-warn':'text-danger'}">${tp}%</span></div>
+        <div class="h-2.5 bg-bg rounded-full overflow-hidden"><div class="h-full rounded-full trust-fill ${tp>=70?'bg-success':tp>=40?'bg-warn':'bg-danger'}" style="width:${tp}%"></div></div></div>
+      <div><div class="flex justify-between mb-1"><span class="text-[11px] text-muted">Patience</span><span class="text-[11px] font-bold ${pp>=50?'text-accent':'text-danger'}">${pp}%</span></div>
+        <div class="h-2.5 bg-bg rounded-full overflow-hidden"><div class="h-full rounded-full trust-fill ${pp>=50?'bg-accent':'bg-danger'}" style="width:${pp}%"></div></div></div>
+    </div>
+    <div class="card mb-4 slide-up">
+      <div class="flex items-start gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">👨‍⚕️</div>
+        <p class="text-sm text-white leading-relaxed">${esc(r.doctorSays)}</p>
+      </div>
+    </div>
+    <div class="space-y-2.5">
+      ${r.options.map((o,i)=>`<button onclick="window._bossChoice(${i})" class="mode-card !p-4">
+        <p class="text-sm text-gray-300 leading-relaxed">${esc(o.text)}</p>
+      </button>`).join('')}
+    </div>
+  </main>`);
+}
+
+window._bossChoice=(i)=>{
+  const r=CONTENT.bossFight.rounds[BR],o=r.options[i];
+  BT=Math.max(0,Math.min(100,BT+o.trust));BP=Math.max(0,Math.min(100,BP+o.patience));
+  BC.push({round:BR,option:o,doctorSays:r.doctorSays});
+  addXP(o.trust>0?15:3);
+  if(BP<=0){showBossDebrief(true);return}
+  BR++;renderBoss();
+};
+
+function showBossDebrief(noPatience){
+  const won=BT>=70&&!noPatience;
+  S.bossBestTrust=Math.max(S.bossBestTrust,BT);if(won)S.bossCompleted=true;
+  addXP(won?50:10);save();
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-6 pb-8">
+    <div class="text-center mb-5 slide-up">
+      <div class="text-5xl mb-2">${won?'🏆':noPatience?'😤':'📉'}</div>
+      <h2 class="text-xl font-bold ${won?'text-success':'text-danger'} mb-1">${won?'Commitment Secured!':noPatience?'Doctor Lost Patience':'Not Enough Trust'}</h2>
+      <p class="text-sm text-muted">Final Trust: ${Math.max(0,Math.min(100,BT))}% (needed 70%)</p>
+    </div>
+    <div class="space-y-3 mb-6">
+      <h3 class="font-bold text-white text-sm">Round-by-Round Debrief</h3>
+      ${BC.map((c,i)=>`<div class="card fade-in">
+        <div class="text-[11px] text-muted mb-1">Round ${i+1}</div>
+        <div class="text-xs text-gray-400 mb-1.5 italic">${esc(c.doctorSays)}</div>
+        <div class="text-xs text-white mb-1.5">"${esc(c.option.text)}"</div>
+        <div class="flex gap-2 mb-2">
+          <span class="badge ${c.option.trust>0?'bg-success/20 text-success':'bg-danger/20 text-danger'} text-[11px]">Trust ${c.option.trust>0?'+':''}${c.option.trust}</span>
+          <span class="badge ${c.option.patience>=0?'bg-accent/20 text-accentGlow':'bg-warn/20 text-warn'} text-[11px]">Patience ${c.option.patience>0?'+':''}${c.option.patience}</span>
+        </div>
+        <p class="text-xs text-muted leading-relaxed">${esc(c.option.feedback)}</p>
+      </div>`).join('')}
+    </div>
+    <div class="space-y-3 max-w-xs mx-auto">
+      <button onclick="_nav('boss')" class="btn-action btn-primary">Try Again</button>
+      <button onclick="_nav('home')" class="btn-action btn-secondary">Home</button>
+    </div>
+  </main>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// ARABIC DRILL
+// ═══════════════════════════════════════════════════════
+let AQ=[],AI=0,AR=false;
+
+function startArabic(){
+  AQ=[...CONTENT.arabicDrill];
+  AQ.forEach((_,i)=>ensureCardState('ar_'+i,'arabic'));
+  AQ.sort((a,b)=>{const ia=CONTENT.arabicDrill.indexOf(a),ib=CONTENT.arabicDrill.indexOf(b);
+    return(S.cardStates['ar_'+ia]?.box||1)-(S.cardStates['ar_'+ib]?.box||1)});
+  AI=0;AR=false;renderArabic();
+}
+
+function renderArabic(){
+  if(AI>=AQ.length){render(`${hdr(true)}<main class="max-w-lg mx-auto px-4 py-12 text-center slide-up">
+    <div class="text-5xl mb-3">🎉</div><h2 class="text-xl font-bold text-white mb-2">Arabic Drill Complete!</h2>
+    <div class="space-y-3 max-w-xs mx-auto mt-6"><button onclick="_nav('arabic')" class="btn-action btn-primary">Go Again</button>
+    <button onclick="_nav('home')" class="btn-action btn-secondary">Home</button></div>
+  </main>`);return}
+  const p=AQ[AI],idx=CONTENT.arabicDrill.indexOf(p),cs=S.cardStates['ar_'+idx]||{box:1};
+  const boxes=[1,2,3,4,5].map(b=>`<div class="w-6 h-1.5 rounded-full ${b<=cs.box?'bg-success':'bg-bg'}"></div>`).join('');
+  render(`${hdr(true)}
+  <main class="max-w-lg mx-auto px-4 py-4 ${AR?'pb-6':'pb-28'}">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-success/20 text-success text-xs">Arabic Drill</span>
+      <span class="text-xs text-muted">${AI+1} / ${AQ.length}</span>
+    </div>
+    <div class="flex gap-1 mb-4">${boxes}</div>
+    <div class="card mb-4 slide-up">
+      <div class="text-xs text-muted mb-2">Say this in Arabic:</div>
+      <h2 class="text-base font-bold text-white leading-relaxed">${esc(p.english)}</h2>
+    </div>
+    ${AR?`<div class="space-y-4 fade-in">
+      <div class="card" style="border-color:rgba(34,197,94,.3)">
+        <div dir="rtl" class="text-xl sm:text-2xl font-bold text-white leading-loose text-right">${esc(p.arabic)}</div>
+      </div>
+      <div class="text-center text-xs text-muted mb-1">How close were you?</div>
+      <div class="grid grid-cols-4 gap-2">
+        <button onclick="window._scoreArabic(1)" class="btn-action btn-danger flex-col !gap-0 !py-3"><span class="text-lg font-bold">1</span><span class="text-[11px]">Blank</span></button>
+        <button onclick="window._scoreArabic(2)" class="btn-action btn-warn flex-col !gap-0 !py-3"><span class="text-lg font-bold">2</span><span class="text-[11px]">Partial</span></button>
+        <button onclick="window._scoreArabic(3)" class="btn-action btn-accent flex-col !gap-0 !py-3"><span class="text-lg font-bold">3</span><span class="text-[11px]">Good</span></button>
+        <button onclick="window._scoreArabic(4)" class="btn-action btn-success flex-col !gap-0 !py-3"><span class="text-lg font-bold">4</span><span class="text-[11px]">Nailed it</span></button>
+      </div>
+    </div>`:
+    `<p class="text-center text-sm text-muted">Say it aloud, then reveal.</p>`}
+  </main>
+  ${AR?'':`<div class="bottom-bar"><div class="max-w-lg mx-auto">
+    <button onclick="window._revealArabic()" class="btn-action btn-primary text-base">Reveal Arabic</button>
+  </div></div>`}`);
+}
+
+window._revealArabic=()=>{if(!AR){AR=true;renderArabic()}};
+window._scoreArabic=(score)=>{
+  const p=AQ[AI],idx=CONTENT.arabicDrill.indexOf(p),id='ar_'+idx;
+  const cs=S.cardStates[id];cs.attempts++;cs.totalScore+=score;cs.lastSeen=Date.now();
+  if(score<=2){cs.box=1;if(AI<AQ.length-1)AQ.splice(Math.min(AI+3,AQ.length),0,p)}
+  else cs.box=Math.min(5,cs.box+1);
+  addXP(score<=2?3:score===3?8:12);save();
+  AI++;AR=false;renderArabic();
+};
+
+// ═══════════════════════════════════════════════════════
+// WEAK SPOTS
+// ═══════════════════════════════════════════════════════
+function drillWeakSpots(){
+  const ws=getWeakSpots();
+  const fids=ws.filter(w=>w.type==='flash').map(w=>w.id);
+  const oids=ws.filter(w=>w.type==='objection').map(w=>w.id);
+  if(fids.length)startFlash(fids);
+  else if(oids.length)startGauntlet(oids);
+  else showHome();
+}
+
+// ═══════════════════════════════════════════════════════
+// FINAL MOCK
+// ═══════════════════════════════════════════════════════
+let MPhase='',MFlash=[],MFI=0,MFR=false,MFScores=[],MGQ=[],MGI=0,MGScores=[],
+    MGTime=45,MGPhase='',MGFast=false,MGUsed=0,
+    MBR=0,MBT=30,MBP=100,MBC=[],MTimer=600;
+
+function startMock(){
+  MPhase='flash';MFScores=[];MGScores=[];MTimer=600;
+  MFlash=[...CONTENT.flashCards].sort(()=>Math.random()-.5).slice(0,5);MFI=0;MFR=false;
+  MGQ=[...CONTENT.objections].sort(()=>Math.random()-.5).slice(0,3);MGI=0;
+  MBR=0;MBT=30;MBP=100;MBC=[];
+  clearInterval(window._timerInterval);
+  window._mockTimer=setInterval(()=>{
+    MTimer--;
+    const el=document.getElementById('m-gtimer');
+    if(el){const m=Math.floor(MTimer/60),s=MTimer%60;el.textContent=`${m}:${s.toString().padStart(2,'0')}`;
+      el.className=`text-xs font-bold tabular-nums ${MTimer<=60?'text-danger':'text-muted'}`}
+    if(MTimer<=0){clearInterval(window._mockTimer);clearInterval(window._timerInterval);showMockResults()}
+  },1000);
+  renderMockFlash();
+}
+
+function mockHdr(){
+  const m=Math.floor(MTimer/60),s=MTimer%60;
+  return`<div class="bg-gradient-to-r from-accent/15 to-purple-900/15 border-b border-accent/20 px-4 py-1.5 flex items-center justify-between">
+    <span class="text-[11px] font-semibold text-accentGlow">FINAL MOCK</span>
+    <span id="m-gtimer" class="text-xs font-bold tabular-nums ${MTimer<=60?'text-danger':'text-muted'}">${m}:${s.toString().padStart(2,'0')}</span>
+  </div>`;
+}
+
+function renderMockFlash(){
+  if(MFI>=MFlash.length){MPhase='gauntlet';renderMockGauntlet();return}
+  const c=MFlash[MFI],ans=resolveTokens(c.answer);
+  render(`${hdr(true)}${mockHdr()}
+  <main class="max-w-lg mx-auto px-4 py-4 ${MFR?'pb-6':'pb-28'}">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-accent/20 text-accentGlow text-xs">Flash ${MFI+1}/5</span>
+      <span class="badge bg-surface text-muted text-xs">${c.category}</span>
+    </div>
+    <div class="card mb-4 slide-up"><h2 class="text-base font-bold text-white">${esc(c.question)}</h2></div>
+    ${MFR?`<div class="card mb-3 fade-in"><div class="text-xs text-gray-300 whitespace-pre-line leading-relaxed">${esc(ans)}</div></div>
+      <div class="grid grid-cols-4 gap-2">
+        <button onclick="window._scoreMF(1)" class="btn-action btn-danger flex-col !gap-0 !py-3"><span class="font-bold">1</span></button>
+        <button onclick="window._scoreMF(2)" class="btn-action btn-warn flex-col !gap-0 !py-3"><span class="font-bold">2</span></button>
+        <button onclick="window._scoreMF(3)" class="btn-action btn-accent flex-col !gap-0 !py-3"><span class="font-bold">3</span></button>
+        <button onclick="window._scoreMF(4)" class="btn-action btn-success flex-col !gap-0 !py-3"><span class="font-bold">4</span></button>
+      </div>`:`<p class="text-sm text-muted text-center">Answer aloud, then reveal.</p>`}
+  </main>
+  ${MFR?'':`<div class="bottom-bar"><div class="max-w-lg mx-auto"><button onclick="MFR=true;renderMockFlash()" class="btn-action btn-primary">Reveal</button></div></div>`}`);
+}
+window._scoreMF=(s)=>{MFScores.push(s);const c=MFlash[MFI],cs=S.cardStates[c.id];if(cs){cs.attempts++;cs.totalScore+=s;cs.lastSeen=Date.now()}addXP(s*2);MFI++;MFR=false;renderMockFlash()};
+
+function renderMockGauntlet(){
+  if(MGI>=MGQ.length){MPhase='boss';renderMockBoss();return}
+  MGPhase='answering';MGTime=45;MGUsed=0;MGFast=false;
+  clearInterval(window._timerInterval);
+  window._timerInterval=setInterval(()=>{
+    MGTime--;MGUsed++;
+    const el=document.getElementById('mg-t');if(el){el.textContent=MGTime+'s';el.className=`text-3xl font-bold tabular-nums ${MGTime<=10?'text-danger timer-pulse':'text-white'}`}
+    const bar=document.getElementById('mg-b');if(bar)bar.style.width=(MGTime/45*100)+'%';
+    if(MGTime<=0){clearInterval(window._timerInterval);MGUsed=45;renderMGScore()}
+  },1000);
+  const o=MGQ[MGI];
+  render(`${hdr(true)}${mockHdr()}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-28">
+    <span class="badge bg-danger/20 text-danger text-xs mb-3 inline-block">Objection ${MGI+1}/3</span>
+    <div class="text-center mb-3"><div id="mg-t" class="text-3xl font-bold tabular-nums text-white">${MGTime}s</div>
+      <div class="w-full h-2 bg-bg rounded-full mt-2 overflow-hidden"><div id="mg-b" class="h-full bg-accent rounded-full transition-all duration-1000" style="width:100%"></div></div></div>
+    <div class="card slide-up"><div class="text-xs text-muted mb-1">${esc(o.context)}</div><h2 class="text-base font-bold text-white">${esc(o.objection)}</h2></div>
+  </main>
+  <div class="bottom-bar"><div class="max-w-lg mx-auto"><button onclick="window._mgDone()" class="btn-action btn-primary">Done</button></div></div>`);
+}
+window._mgDone=()=>{if(MGPhase!=='answering')return;clearInterval(window._timerInterval);MGFast=MGUsed<30;renderMGScore()};
+
+function renderMGScore(){
+  MGPhase='scoring';const o=MGQ[MGI];
+  render(`${hdr(true)}${mockHdr()}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-28">
+    <div class="card mb-3"><div class="text-xs text-accent font-semibold mb-1">Model Answer</div><div class="text-xs text-gray-300 whitespace-pre-line leading-relaxed">${esc(o.modelAnswer)}</div></div>
+    <div class="card mb-3 space-y-1">
+      <label class="checkbox-row"><input type="checkbox" id="mgc_1"><span class="text-sm text-gray-300">Acknowledged</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="mgc_2"><span class="text-sm text-gray-300">Asked a question</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="mgc_3"><span class="text-sm text-gray-300">Pivoted to patient</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="mgc_4"><span class="text-sm text-gray-300">Used evidence</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="mgc_5"><span class="text-sm text-gray-300">Specific close</span></label>
+      <label class="checkbox-row"><input type="checkbox" id="mgc_6"><span class="text-sm text-gray-300">Stayed compliant</span></label>
+    </div>
+  </main>
+  <div class="bottom-bar"><div class="max-w-lg mx-auto"><button onclick="window._submitMG()" class="btn-action btn-primary">Submit</button></div></div>`);
+}
+window._submitMG=()=>{
+  const cmp=document.getElementById('mgc_6')?.checked;
+  let cnt=0;for(let i=1;i<=6;i++)if(document.getElementById('mgc_'+i)?.checked)cnt++;
+  MGScores.push(cmp?cnt*10+(MGFast?10:0):0);
+  addXP(Math.round((cmp?cnt*10:0)/3));
+  MGI++;renderMockGauntlet();
+};
+
+function renderMockBoss(){
+  if(MBR>=2){showMockResults();return}
+  const r=CONTENT.bossFight.rounds[MBR],tp=Math.max(0,Math.min(100,MBT));
+  render(`${hdr(true)}${mockHdr()}
+  <main class="max-w-lg mx-auto px-4 py-4 pb-6">
+    <div class="flex items-center justify-between mb-3">
+      <span class="badge bg-warn/20 text-warn text-xs">Boss ${MBR+1}/2</span>
+      <span class="text-xs text-muted">Trust: ${tp}%</span>
+    </div>
+    <div class="card mb-3 slide-up"><p class="text-sm text-white">${esc(r.doctorSays)}</p></div>
+    <div class="space-y-2">${r.options.map((o,i)=>`<button onclick="window._mockBoss(${i})" class="mode-card !p-3.5"><p class="text-sm text-gray-300">${esc(o.text)}</p></button>`).join('')}</div>
+  </main>`);
+}
+window._mockBoss=(i)=>{const r=CONTENT.bossFight.rounds[MBR],o=r.options[i];MBT=Math.max(0,Math.min(100,MBT+o.trust));MBP=Math.max(0,Math.min(100,MBP+o.patience));MBC.push({option:o});addXP(o.trust>0?10:2);MBR++;renderMockBoss()};
+
+function showMockResults(){
+  clearInterval(window._mockTimer);clearInterval(window._timerInterval);
+  const fAvg=MFScores.length?MFScores.reduce((a,b)=>a+b,0)/MFScores.length:0;
+  const fPct=Math.round(fAvg/4*100);
+  const gTotal=MGScores.reduce((a,b)=>a+b,0),gMax=MGQ.length*70,gPct=gMax?Math.round(gTotal/gMax*100):0;
+  const bPct=Math.max(0,Math.min(100,MBT));
+  const readiness=Math.round(fPct*.4+gPct*.35+bPct*.25);
+  let verdict,vColor,vIcon;
+  if(readiness>=85){verdict="You're ready. Walk in with confidence.";vColor='text-success';vIcon='🏆'}
+  else if(readiness>=70){verdict="Solid foundation. Review weak spots one more time.";vColor='text-accentGlow';vIcon='💪'}
+  else if(readiness>=50){verdict="Getting there. Focus on objections and products.";vColor='text-warn';vIcon='📚'}
+  else{verdict="More practice needed. Hit Flash Recall and Gauntlet.";vColor='text-danger';vIcon='🔄'}
+  render(`${hdr(true)}<main class="max-w-lg mx-auto px-4 py-6 text-center slide-up">
+    <div class="text-5xl mb-2">${vIcon}</div>
+    <h2 class="text-xl font-bold text-white mb-1">Mock Complete</h2>
+    <div class="text-5xl font-bold ${vColor} my-3">${readiness}%</div>
+    <p class="text-sm text-muted mb-5">${verdict}</p>
+    <div class="space-y-2 mb-6">
+      <div class="card flex justify-between items-center !py-3"><span class="text-sm text-gray-300">Flash Recall</span><span class="font-bold ${fPct>=70?'text-success':'text-warn'}">${fPct}%</span></div>
+      <div class="card flex justify-between items-center !py-3"><span class="text-sm text-gray-300">Gauntlet</span><span class="font-bold ${gPct>=70?'text-success':'text-warn'}">${gPct}%</span></div>
+      <div class="card flex justify-between items-center !py-3"><span class="text-sm text-gray-300">Boss Fight</span><span class="font-bold ${bPct>=70?'text-success':'text-warn'}">${bPct}%</span></div>
+    </div>
+    <div class="space-y-3 max-w-xs mx-auto">
+      <button onclick="_nav('mock')" class="btn-action btn-primary">Try Again</button>
+      <button onclick="_nav('home')" class="btn-action btn-secondary">Home</button>
+    </div>
+  </main>`);
+}
+
+// ═══════════════════════════════════════════════════════
+// KEYBOARD SHORTCUTS (enhancement only — all have tap equivalents)
+// ═══════════════════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')return;
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(!FR&&FI<(FQ?.length||0))window._revealFlash();
+    else if(!AR&&AI<(AQ?.length||0))window._revealArabic();
+    else if(!MFR&&MPhase==='flash')document.querySelector('[onclick*="MFR=true"]')?.click();
+  }
+  if(e.key>='1'&&e.key<='4'){
+    const s=parseInt(e.key);
+    if(FR&&FI<(FQ?.length||0))window._scoreFlash(s);
+    else if(AR&&AI<(AQ?.length||0))window._scoreArabic(s);
+    else if(MFR&&MPhase==='flash')window._scoreMF(s);
+  }
+  if(e.code==='Enter'){
+    if(GPhase==='answering'&&GI<(GQ?.length||0))window._gauntletDone();
+    else if(MGPhase==='answering'&&MPhase==='gauntlet')window._mgDone();
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+showHome();
+</script>
+</body>
+</html>
